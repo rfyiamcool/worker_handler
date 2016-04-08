@@ -4,7 +4,7 @@ import os
 import time
 import signal
 import logging
-from multiprocessing import Process
+from multiprocessing import Process, Manager
 from setproctitle import setproctitle
 
 from config import *
@@ -12,6 +12,11 @@ from log import logger
 from daemonize import daemonize
 
 logging.basicConfig(level=logging.DEBUG,format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s')
+
+jobs = {}
+is_running = True
+#manager = Manager()
+#running_status = manager.Value('tmp', True)
 
 #判断进程及lock是否存在
 def set_exists_pid():
@@ -42,13 +47,16 @@ def set_exists_pid():
 def worker(args):
     setproctitle("Monitor :Worker")   #设置进程的名字
     global is_running
+    global running_status
     counter = 0
+    print "child pid %s"%os.getpid()
+#    while running_status.value:
     while is_running:
         counter += 1
-        if counter >= max_requests:
-            raise("beyond max_requests")
-        print "child pid %s"%os.getpid()
-        time.sleep(3)
+#        if counter >= max_requests:
+#            return
+        time.sleep(0.01)
+    logger.info('def worker exit')
 
 
 def kworker(args):
@@ -61,6 +69,8 @@ def kworker(args):
 def sig_handler(num, stack):
     logger.info('receiving signal, exiting...')
     global is_running
+#    global running_status
+#    running_status.value = False
     is_running = False
 
 #添加进程
@@ -131,18 +141,32 @@ def spawn_worker():
             except:
                 pass
     else:
-        time.sleep(3)
+        _c = 0
+        interval = 0.1
+        while 1:
+            logger.info(str(_c))
+            logger.info(str(jobs))
+            if _c >= 30 or len(jobs) == 0:
+                break
+            for pid in jobs.keys():
+                if not check_status(pid):
+                    jobs.pop(pid) 
+                _c += 1
+            time.sleep(0.1)
         for pid in jobs:
             try:
                 os.kill(pid,signal.SIGKILL)
             except:
                 pass
-    #os.remove(pid_file)
+    os.remove(pid_file)
 
 
 if __name__ == '__main__':
     if daemon_flag:
         daemonize()
+    if not set_exists_pid():
+        logger.error("service is alive")
+        exit(0)
     setproctitle("Monitor :Master")
     signal.signal(signal.SIGINT, sig_handler)
     signal.signal(signal.SIGTERM, sig_handler)
@@ -150,9 +174,6 @@ if __name__ == '__main__':
     signal.signal(signal.SIGTTOU, sig_reduce)
     #第二种方法，直接忽视子进程退出前发出的sigchld信号，交给内核，让内核来收拾，其实也是让内核用waitpid来解决。
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
-    if not set_exists_pid():
-        logger.error("service is alive")
-        exit(0)
     logger.info('main process: %d start', os.getpid())
     spawn_worker()
     logger.info('main: %d kill all jobs done', os.getpid())

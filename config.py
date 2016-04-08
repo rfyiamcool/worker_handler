@@ -1,7 +1,5 @@
 pid_file = 'pid.sock'
-max_requests = 100
+max_requests = 100000
 daemon_flag = True
 process_num = 2
-jobs = {}
-is_running = True
 log_file = 'debug.log'
