@@ -10,7 +10,7 @@ def daemonize():
         return -1
     elif pid>0: # parent.
         exit(0)
-    os.chdir("/") 
+    os.chdir(os.getcwd()) 
     os.setsid()
     pid=os.fork() # fork 2
     if pid<0:
