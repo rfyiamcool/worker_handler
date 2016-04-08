@@ -4,7 +4,7 @@ import os
 import time
 import signal
 import logging
-from multiprocessing import Process, Manager
+from multiprocessing import Process, Value
 from setproctitle import setproctitle
 
 from config import *
@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.DEBUG,format='%(asctime)s %(filename)s[line:%(
 jobs = {}
 is_running = True
 #manager = Manager()
+running_status = Value('d', True)
 #running_status = manager.Value('tmp', True)
 
 #判断进程及lock是否存在
@@ -50,8 +51,8 @@ def worker(args):
     global running_status
     counter = 0
     print "child pid %s"%os.getpid()
-#    while running_status.value:
-    while is_running:
+    while running_status.value:
+#    while is_running:
         counter += 1
 #        if counter >= max_requests:
 #            return
@@ -69,8 +70,8 @@ def kworker(args):
 def sig_handler(num, stack):
     logger.info('receiving signal, exiting...')
     global is_running
-#    global running_status
-#    running_status.value = False
+    global running_status
+    running_status.value = False
     is_running = False
 
 #添加进程
@@ -162,8 +163,8 @@ def spawn_worker():
 
 
 if __name__ == '__main__':
-    if daemon_flag:
-        daemonize()
+#    if daemon_flag:
+#        daemonize()
     if not set_exists_pid():
         logger.error("service is alive")
         exit(0)
