@@ -13,6 +13,31 @@ from daemonize import daemonize
 
 logging.basicConfig(level=logging.DEBUG,format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s')
 
+#判断进程及lock是否存在
+def set_exists_pid():
+    continue_status = False
+    if os.path.exists(pid_file):
+        with open(pid_file,'r') as f:
+            pid = f.read()
+        if len(pid) == 0:
+            continue_status = True
+        else:
+            pid = int(pid)
+            
+            if check_status(pid):
+                return False
+            else:
+                continue_status = True
+    else:
+         continue_status = True
+
+    if continue_status:
+        with open(pid_file,'w') as f:
+            logger.info('write pid %s'%os.getpid())
+            f.write(str(os.getpid()))
+    return continue_status
+        
+
 #你的业务逻辑
 def worker(args):
     setproctitle("Monitor :Worker")   #设置进程的名字
@@ -23,7 +48,7 @@ def worker(args):
         if counter >= max_requests:
             raise("beyond max_requests")
         print "child pid %s"%os.getpid()
-        time.sleep(0.1)
+        time.sleep(3)
 
 
 def kworker(args):
@@ -92,7 +117,6 @@ def spawn_worker():
     res = fork_process(process_num)
     jobs.update(res)
     while is_running:
-        print jobs
         time.sleep(0.01)
         #第一种方法，调用非阻塞waitpid方法收尸
         if len(jobs) < process_num:
@@ -113,6 +137,7 @@ def spawn_worker():
                 os.kill(pid,signal.SIGKILL)
             except:
                 pass
+    #os.remove(pid_file)
 
 
 if __name__ == '__main__':
@@ -125,6 +150,9 @@ if __name__ == '__main__':
     signal.signal(signal.SIGTTOU, sig_reduce)
     #第二种方法，直接忽视子进程退出前发出的sigchld信号，交给内核，让内核来收拾，其实也是让内核用waitpid来解决。
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+    if not set_exists_pid():
+        logger.error("service is alive")
+        exit(0)
     logger.info('main process: %d start', os.getpid())
     spawn_worker()
     logger.info('main: %d kill all jobs done', os.getpid())

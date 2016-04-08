@@ -1,3 +1,4 @@
+pid_file = 'pid.sock'
 max_requests = 100
 daemon_flag = True
 process_num = 2
