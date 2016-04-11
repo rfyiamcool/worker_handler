@@ -7,6 +7,7 @@ import logging
 from multiprocessing import Process, Value
 from setproctitle import setproctitle
 
+from worker import kworker_handler,worker_handler
 from config import *
 from log import logger
 from daemonize import daemonize
@@ -44,28 +45,6 @@ def set_exists_pid():
     return continue_status
         
 
-#你的业务逻辑
-def worker(args):
-    setproctitle("Monitor :Worker")   #设置进程的名字
-    global is_running
-    global running_status
-    counter = 0
-    print "child pid %s"%os.getpid()
-    while running_status.value:
-#    while is_running:
-        counter += 1
-#        if counter >= max_requests:
-#            return
-        time.sleep(0.01)
-    logger.info('def worker exit')
-
-
-def kworker(args):
-    setproctitle("Monitor :kworker")   #设置进程的名字
-    global is_running
-    time.sleep(5)
-
-
 #接收信号，比如 kill，或者是键盘 ctrl c
 def sig_handler(num, stack):
     logger.info('receiving signal, exiting...')
@@ -74,12 +53,14 @@ def sig_handler(num, stack):
     running_status.value = False
     is_running = False
 
+
 #添加进程
 def sig_add(num, stack):
     logger.info('receiving add signal, Add Process...')
     global jobs
     res = fork_process(process_num)
     jobs.update(res)
+
 
 #亲切的干掉一个进程
 def sig_reduce(num, stack):
@@ -95,17 +76,31 @@ def sig_reduce(num, stack):
             logger.info('receiving reduce signal,%s be killed'%pid)
         return
 
+
+#调用工作函数的入口
+def request_worker(func,process_name):
+    setproctitle(process_name)   #设置进程的名字
+    global running_status
+    logger.info("child pid %s"%os.getpid())
+    counter = 0
+    while running_status.value:
+        s = func()
+        if s:   #如果有返回值，那么判断该任务只想运行一次
+            break
+
+
 #fork进程
 def fork_process(x):
     jobs = {}
     for i in xrange(x):
         detail = {}
-        p = Process(target = worker, args = (i,))
+        p = Process(target = request_worker, args = (worker_handler,"Monitor :worker"))
         p.start()
         detail['obj'] = p
         detail['is_running'] = True
         jobs[p.pid] = detail
     return jobs
+
 
 #探测一个进程的状态
 def check_status(pid):
@@ -115,11 +110,13 @@ def check_status(pid):
     except:
         return False
 
+
 #管理进程总控
 def spawn_worker():
     global jobs
     parent_id = os.getpid()
-    p = Process(target = kworker, args = ("1",))
+    #p = Process(target = kworker_handler, args = ())
+    p = Process(target = request_worker, args = (kworker_handler,"Monitor :kworker"))
     p.start()
     detail = {}
     detail['obj'] = p
@@ -163,8 +160,8 @@ def spawn_worker():
 
 
 if __name__ == '__main__':
-#    if daemon_flag:
-#        daemonize()
+    if daemon_flag:
+        daemonize()
     if not set_exists_pid():
         logger.error("service is alive")
         exit(0)
