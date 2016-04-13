@@ -13,3 +13,6 @@ def kworker_handler():
 def worker_handler():
     time.sleep(0.01)
     logger.info('this is worker_handler')
+
+ALLOW_METHOD = [{"func":kworker_handler,"counte":1},{"func":worker_handler,"count":3}]
+

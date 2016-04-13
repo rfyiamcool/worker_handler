@@ -12,7 +12,6 @@ from config import *
 from log import logger
 from daemonize import daemonize
 
-logging.basicConfig(level=logging.DEBUG,format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s')
 
 jobs = {}
 is_running = True
