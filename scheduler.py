@@ -15,9 +15,8 @@ from daemonize import daemonize
 
 jobs = {}
 is_running = True
-#manager = Manager()
 running_status = Value('d', True)
-#running_status = manager.Value('tmp', True)
+
 
 #判断进程及lock是否存在
 def set_exists_pid():
@@ -56,30 +55,28 @@ def sig_handler(num, stack):
 #添加进程
 def sig_add(num, stack):
     logger.info('receiving add signal, Add Process...')
-    global jobs
-    res = fork_process(process_num)
+    #res = fork_process(process_num)
+    res = fork_process(1)
     jobs.update(res)
 
 
 #亲切的干掉一个进程
 def sig_reduce(num, stack):
     logger.info('receiving signal, Reduce Process...')
-    global jobs
     for pid,pid_obj in jobs.iteritems():
-        print pid,pid_obj
         jobs[pid]['is_running'] = False
         time.sleep(5)
         if pid_obj['obj'].is_alive():
             pid_obj['obj'].terminate()
 #            os.kill(pid, signal.SIGKILL)
             logger.info('receiving reduce signal,%s be killed'%pid)
-        return
+            return
 
 
 #调用工作函数的入口
 def request_worker(func,process_name):
     setproctitle(process_name)   #设置进程的名字
-    global running_status
+#    global running_status
     logger.info("child pid %s"%os.getpid())
     counter = 0
     while running_status.value:
@@ -112,9 +109,7 @@ def check_status(pid):
 
 #管理进程总控
 def spawn_worker():
-    global jobs
     parent_id = os.getpid()
-    #p = Process(target = kworker_handler, args = ())
     p = Process(target = request_worker, args = (kworker_handler,"Monitor :kworker"))
     p.start()
     detail = {}
