@@ -5,12 +5,13 @@ import time
 import signal
 import logging
 from multiprocessing import Process, Value
+
 from setproctitle import setproctitle
 
-from worker import kworker_handler,worker_handler
 from config import *
 from log import logger
 from daemonize import daemonize
+from worker import kworker_handler, worker_handler
 
 
 jobs = {}
@@ -22,26 +23,25 @@ running_status = Value('d', True)
 def set_exists_pid():
     continue_status = False
     if os.path.exists(pid_file):
-        with open(pid_file,'r') as f:
+        with open(pid_file, 'r') as f:
             pid = f.read()
         if len(pid) == 0:
             continue_status = True
         else:
             pid = int(pid)
-            
             if check_status(pid):
                 return False
             else:
                 continue_status = True
     else:
-         continue_status = True
+        continue_status = True
 
     if continue_status:
-        with open(pid_file,'w') as f:
+        with open(pid_file, 'w') as f:
             logger.info('write pid %s'%os.getpid())
             f.write(str(os.getpid()))
     return continue_status
-        
+
 
 #接收信号，比如 kill，或者是键盘 ctrl c
 def sig_handler(num, stack):
@@ -63,7 +63,7 @@ def sig_add(num, stack):
 #亲切的干掉一个进程
 def sig_reduce(num, stack):
     logger.info('receiving signal, Reduce Process...')
-    for pid,pid_obj in jobs.iteritems():
+    for pid, pid_obj in jobs.iteritems():
         jobs[pid]['is_running'] = False
         time.sleep(5)
         if pid_obj['obj'].is_alive():
@@ -74,11 +74,11 @@ def sig_reduce(num, stack):
 
 
 #调用工作函数的入口
-def request_worker(func,process_name):
+def request_worker(func, process_name):
     setproctitle(process_name)   #设置进程的名字
 #    global running_status
     logger.info("child pid %s"%os.getpid())
-    counter = 0
+    # counter = 0
     while running_status.value:
         s = func()
         if s:   #如果有返回值，那么判断该任务只想运行一次
@@ -90,7 +90,7 @@ def fork_process(x):
     jobs = {}
     for i in xrange(x):
         detail = {}
-        p = Process(target = request_worker, args = (worker_handler,"Monitor :worker"))
+        p = Process(target=request_worker, args=(worker_handler, "Monitor :worker"))
         p.start()
         detail['obj'] = p
         detail['is_running'] = True
@@ -101,7 +101,7 @@ def fork_process(x):
 #探测一个进程的状态
 def check_status(pid):
     try:
-        os.kill(pid,0)
+        os.kill(pid, 0)
         return True
     except:
         return False
@@ -109,8 +109,8 @@ def check_status(pid):
 
 #管理进程总控
 def spawn_worker():
-    parent_id = os.getpid()
-    p = Process(target = request_worker, args = (kworker_handler,"Monitor :kworker"))
+    # parent_id = os.getpid()
+    p = Process(target=request_worker, args=(kworker_handler, "Monitor :kworker"))
     p.start()
     detail = {}
     detail['obj'] = p
@@ -122,19 +122,18 @@ def spawn_worker():
         time.sleep(0.01)
         #第一种方法，调用非阻塞waitpid方法收尸
         if len(jobs) < process_num:
-            res = fork_process(process_num - len(jobs))
+            res = fork_process(process_num-len(jobs))
             jobs.update(res)
         for pid in jobs.keys():
             try:
                 if not check_status(pid):
-#                if not jobs[pid]['obj'].is_alive():
                     del jobs[pid]
                 os.waitpid(pid, os.WNOHANG)
             except:
                 pass
     else:
         _c = 0
-        interval = 0.1
+        # interval = 0.1
         while 1:
             logger.info(str(_c))
             logger.info(str(jobs))
@@ -142,12 +141,12 @@ def spawn_worker():
                 break
             for pid in jobs.keys():
                 if not check_status(pid):
-                    jobs.pop(pid) 
+                    jobs.pop(pid)
                 _c += 1
             time.sleep(0.1)
         for pid in jobs:
             try:
-                os.kill(pid,signal.SIGKILL)
+                os.kill(pid, signal.SIGKILL)
             except:
                 pass
     os.remove(pid_file)
@@ -156,9 +155,11 @@ def spawn_worker():
 if __name__ == '__main__':
     if daemon_flag:
         daemonize()
+
     if not set_exists_pid():
         logger.error("service is alive")
         exit(0)
+
     setproctitle("Monitor :Master")
     signal.signal(signal.SIGINT, sig_handler)
     signal.signal(signal.SIGTERM, sig_handler)
