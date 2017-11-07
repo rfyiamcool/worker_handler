@@ -8,7 +8,7 @@ from multiprocessing import Process, Value
 
 from setproctitle import setproctitle
 
-from config import *
+from config import process_num, daemon_flag, pid_file
 from log import logger
 from daemonize import daemonize
 from worker import kworker_handler, worker_handler
@@ -170,4 +170,3 @@ if __name__ == '__main__':
     logger.info('main process: %d start', os.getpid())
     spawn_worker()
     logger.info('main: %d kill all jobs done', os.getpid())
-
